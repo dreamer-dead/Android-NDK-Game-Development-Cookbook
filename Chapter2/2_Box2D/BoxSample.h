@@ -45,7 +45,7 @@ namespace Box2D
 
 Box2D::Body* CreateBody( const Box2D::Vec2& Size, float Mass, float Friction );
 
-Box2D::Body* CreateBodyPos( const Box2D::Vec2& Pos, float Ang, const Vec2& Size, float Mass, float Friction );
+Box2D::Body* CreateBodyPos( const Box2D::Vec2& Pos, float Ang, const Box2D::Vec2& Size, float Mass, float Friction );
 
 Box2D::Joint* CreateJoint( Box2D::Body* B1, Box2D::Body* B2, const Box2D::Vec2& Anchor, float Softness, float Bias );
 

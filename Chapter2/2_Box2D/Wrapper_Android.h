@@ -31,9 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _Wrapper_Android_h_
-#define _Wrapper_Android_h_
+#ifndef Wrapper_Android_h
+#define Wrapper_Android_h
 
 #include "Wrapper_Callbacks.h"
 
-#endif
+#endif // Wrapper_Android_h

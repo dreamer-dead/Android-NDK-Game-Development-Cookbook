@@ -31,21 +31,45 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _Wrapper_Callbacks_h_
-#define _Wrapper_Callbacks_h_
+#ifndef Wrapper_Callbacks_h
+#define Wrapper_Callbacks_h
 
 const int ImageWidth = 512;
 const int ImageHeight = 512;
 
 extern unsigned char* g_FrameBuffer;
 
-void OnStart();
-void OnDrawFrame();
-void OnTimer( float Delta );
-void OnKeyUp( int code );
-void OnKeyDown( int code );
-void OnMouseDown( int btn, int x, int y );
-void OnMouseMove( int x, int y );
-void OnMouseUp( int btn, int x, int y );
+struct EventObserver
+{
+	virtual void OnStart() {}
+	virtual void OnDrawFrame() {}
+	virtual void OnTimer( float Delta ) {}
+	virtual void OnKeyUp( int code ) {}
+	virtual void OnKeyDown( int code ) {}
+	virtual void OnMouseDown( int btn, int x, int y ) {}
+	virtual void OnMouseMove( int x, int y ) {}
+	virtual void OnMouseUp( int btn, int x, int y ) {}
 
-#endif
+	virtual ~EventObserver() {}
+};
+
+struct PlatformLayer
+{
+	static EventObserver* CreateObserver(PlatformLayer* platform);
+
+	virtual ~PlatformLayer() {}
+
+protected:
+	void FireOnStart() { if (FObserver) FObserver->OnStart(); }
+	void FireOnDrawFrame() { if (FObserver) FObserver->OnDrawFrame(); }
+	void FireOnTimer( float Delta ) { if (FObserver) FObserver->OnTimer(Delta); }
+	void FireOnKeyUp( int code ) { if (FObserver) FObserver->OnKeyUp(code); }
+	void FireOnKeyDown( int code ) { if (FObserver) FObserver->OnKeyDown(code); }
+	void FireOnMouseDown( int btn, int x, int y ) { if (FObserver) FObserver->OnMouseDown(btn, x, y); }
+	void FireOnMouseMove( int x, int y ) { if (FObserver) FObserver->OnMouseMove(x, y); }
+	void FireOnMouseUp( int btn, int x, int y ) { if (FObserver) FObserver->OnMouseUp(btn, x, y); }
+
+	EventObserver* FObserver;
+};
+
+#endif // Wrapper_Callbacks_h
