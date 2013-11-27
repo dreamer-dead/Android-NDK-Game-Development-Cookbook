@@ -33,6 +33,9 @@
 
 #include "Rendering.h"
 
+#include <algorithm> // For std::swap
+#include <cstring> // For memcpy
+
 const int Width = ImageWidth;
 const int Height = ImageHeight;
 
@@ -43,12 +46,14 @@ unsigned char* g_FrameBuffer;
 
 void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color )
 {
+	using std::swap;
+
 	int F, x, y;
 
 	if ( p1x > p2x ) // Swap points if p1 is on the right of p2
 	{
-		swap_int( p1x, p2x );
-		swap_int( p1y, p2y );
+		swap( p1x, p2x );
+		swap( p1y, p2y );
 	}
 
 	// Handle trivial cases separately for algorithm speed up.
@@ -56,7 +61,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 	if ( p1x == p2x )
 	{
 		// Swap y-coordinates if p1 is above p2
-		if ( p1y > p2y ) { swap_int( p1y, p2y ); }
+		if ( p1y > p2y ) { swap( p1y, p2y ); }
 
 		x = p1x;
 		y = p1y;
@@ -203,20 +208,22 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 void Clear( int color )
 {
-	int w = Width, h = Height;
+	const unsigned char PATTERN[] = { color & 0xFF, ( color >> 8 ) & 0xFF, ( color >> 16 ) & 0xFF, 0x00 };
+	const size_t BufferLength = Width * Height * 4;
+	size_t BlockSize = sizeof(PATTERN); // Size of pattern
+	unsigned char* Ptr = g_FrameBuffer;
 
-	unsigned char r = ( color & 0xFF );
-	unsigned char g = ( ( color >> 8 ) & 0xFF );
-	unsigned char b = ( ( color >> 16 ) & 0xFF );
+	memcpy(Ptr, PATTERN, BlockSize);
+	unsigned char * Start = Ptr;
+	unsigned char * Current = Ptr + BlockSize;
+	unsigned char * End = Start + BufferLength;
 
-	unsigned char* ptr = g_FrameBuffer;
-
-	for ( int y = 0 ; y < h ; y++ )
-		for ( int x = 0 ; x < w ; x++ )
-		{
-			*ptr++ = r;
-			*ptr++ = g;
-			*ptr++ = b;
-			ptr++;
-		}
+	// Fill the buffer with pattern.
+	while(Current + BlockSize < End) {
+	    memcpy(Current, Start, BlockSize);
+	    Current += BlockSize;
+	    BlockSize *= 2;
+	}
+	// Fill the rest.
+	memcpy(Current, Start, static_cast<size_t>( End - Current ));
 }
