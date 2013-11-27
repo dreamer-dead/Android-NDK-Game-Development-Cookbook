@@ -31,26 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "Wrapper_Callbacks.h"
-
 #ifndef Rendering_h
 #define Rendering_h
 
-extern unsigned char* g_FrameBuffer;
+#include <cstddef>
+#include "Wrapper_Callbacks.h"
 
-extern const int Width;
-extern const int Height;
-
-extern float XScale, YScale;
-extern float XOfs, YOfs;
-
-inline int XToScreen( float x ) { return Width / 2 + x * XScale + XOfs; }
-inline int YToScreen( float y ) { return Height / 2 - y * YScale + YOfs; }
-
-inline float ScreenToX( int x ) { return ( ( float )( x - Width / 2 )  - XOfs ) / XScale; }
-inline float ScreenToY( int y ) { return -( ( float )( y - Height / 2 ) - YOfs ) / YScale; }
-
-inline void set_pixel( unsigned char* fb, int w, int h, int x, int y, int color )
+inline void SetPixel( unsigned char* fb, int w, int h, int x, int y, int color )
 {
   if ( x < 0 || y < 0 || x > w - 1 || y > h - 1 ) { return; }
 
@@ -61,18 +48,56 @@ inline void set_pixel( unsigned char* fb, int w, int h, int x, int y, int color 
   *fb = 0;
 }
 
-void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color );
+void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color );
 
-inline void Line( int x1, int y1, int x2, int y2, int color )
+class Renderer
 {
-  line_bresenham( g_FrameBuffer, Width, Height, x1, y1, x2, y2, color );
-}
+public:
+  Renderer( int w, int h )
+    : FWidth( w ), FHeight( h ),
+      FXScale(1.f), FYScale(1.f),
+      FXOfs(0.f), FYOfs(0.f),
+      FFrameBuffer(NULL), FFrameBufferSize(0)
+  {}
 
-void Clear( int color );
+  ~Renderer();
 
-inline void LineW( float x1, float y1, float x2, float y2, int color )
-{
-  Line( XToScreen( x1 ), YToScreen( y1 ), XToScreen( x2 ), YToScreen( y2 ), color );
-}
+  void SetScale( float x, float y ) { FXScale = x; FYScale = y; }
+  void SetOffsets( float x, float y ) { FYOfs = x; FYOfs = y; }
+
+  int XToScreen( float x ) { return FWidth / 2 + x * FXScale + FXOfs; }
+  int YToScreen( float y ) { return FHeight / 2 - y * FYScale + FYOfs; }
+
+  float ScreenToX( int x ) { return ( ( float )( x - FWidth / 2 )  - FXOfs ) / FXScale; }
+  float ScreenToY( int y ) { return -( ( float )( y - FHeight / 2 ) - FYOfs ) / FYScale; }
+
+  bool Init();
+  
+  void Clear( int color );
+
+  inline void Line( int x1, int y1, int x2, int y2, int color )
+  {
+    LineBresenham( FFrameBuffer, FWidth, FHeight, x1, y1, x2, y2, color );
+  }
+
+  inline void LineW( float x1, float y1, float x2, float y2, int color )
+  {
+    Line( XToScreen( x1 ), YToScreen( y1 ), XToScreen( x2 ), YToScreen( y2 ), color );
+  }
+
+  const unsigned char* GetFrameBuffer() const { return FFrameBuffer; }
+
+  size_t GetWidth() const { return FWidth; }
+  size_t GetHeight() const { return FHeight; }
+
+private:
+  unsigned char* FFrameBuffer;
+  size_t FFrameBufferSize;
+  float FXScale, FYScale;
+  float FXOfs, FYOfs;
+
+  const int FWidth;
+  const int FHeight;
+};
 
 #endif // Rendering_h

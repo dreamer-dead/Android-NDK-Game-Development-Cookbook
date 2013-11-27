@@ -38,7 +38,7 @@
 
 #include "Wrapper_Callbacks.h"
 
-class WindowsPlatformLayer : public PlatformLayer
+class WindowsPlatformLayer: public PlatformLayer
 {
 public:
 	WindowsPlatformLayer();

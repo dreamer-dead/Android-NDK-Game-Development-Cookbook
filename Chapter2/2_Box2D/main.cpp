@@ -84,20 +84,97 @@ typedef LARGE_INTEGER time_value_t;
 
 #define TIME_TO_DOUBLE(t) static_cast<double>( t.QuadPart )
 
-#endif // _WIN32
+#endif // ifndef _WIN32
 	
 namespace
 {
-	const float TIME_STEP = 0.016666f;
+	static const float TIME_STEP = 0.016666f;
+	static const int ImageWidth = 512;
+	static const int ImageHeight = 512;
 
 	using namespace Box2D;
 
-	void DrawLine2( const Vec2& v1, const Vec2& v2 )
+	struct Box2DEventObserver: public EventObserver
 	{
-		LineW( v1.x, v1.y, v2.x, v2.y, 0 ); // 0xFFFFFF);
+		Box2DEventObserver()
+			: FLocalTime(0.f), FRecipCyclesPerSecond(1.f),
+				FRenderer(ImageWidth, ImageHeight)
+		{}
+
+		virtual ~Box2DEventObserver() {}
+
+		virtual void OnStart();
+		virtual void OnDrawFrame( DrawFrameInfo* frameInfo );
+		virtual void OnTimer( float Delta );
+
+	private:
+		void DrawLine2( const Vec2& v1, const Vec2& v2 )
+		{
+			FRenderer.LineW( v1.x, v1.y, v2.x, v2.y, 0 ); // 0xFFFFFF);
+		}
+
+		void DrawBody( const Body& body );
+		void DrawJoint( const Joint& joint );
+
+		void StartTiming();
+		double GetSeconds() const;
+		void GenerateTicks();
+
+		double FNewTime, FOldTime, FExecutionTime;
+		float FLocalTime;
+		float FRecipCyclesPerSecond;
+		std::auto_ptr<World> FWorld;
+		Renderer FRenderer;
+	};
+
+	void Box2DEventObserver::OnStart()
+	{
+		FRenderer.SetScale( 15.f, 15.f );
+		FRenderer.SetOffsets( 0.f, 0.f );
+		FRenderer.Init();
+
+		StartTiming();
+
+		FOldTime = GetSeconds();
+		FNewTime = FOldTime;
+
+		FExecutionTime = 0;
+
+		FWorld.reset( new World( Vec2( 0, 0 ), 10 ) );
+		setup3( FWorld.get() );
 	}
 
-	void DrawBody( const Body& body )
+	void Box2DEventObserver::OnDrawFrame( DrawFrameInfo* frameInfo )
+	{
+		// render physics world
+		FRenderer.Clear( 0xFFFFFF );
+
+		std::vector<Body*>::const_iterator BodyBegin = FWorld->bodies.begin(), BodyEnd = FWorld->bodies.end();
+		for ( ; BodyBegin != BodyEnd ; ++BodyBegin )
+		{
+			DrawBody( **BodyBegin );
+		}
+
+		std::vector<Joint*>::const_iterator JointsBegin = FWorld->joints.begin(), JointsEnd = FWorld->joints.end();
+		for ( ; JointsBegin != JointsEnd ; ++JointsBegin )
+		{
+			DrawJoint( **JointsBegin );
+		}
+
+		// update as fast as possible
+		GenerateTicks();
+
+		frameInfo->frame = FRenderer.GetFrameBuffer();
+		frameInfo->frameWidth = FRenderer.GetWidth();
+		frameInfo->frameHeight = FRenderer.GetHeight();
+	}
+
+	void Box2DEventObserver::OnTimer( float Delta )
+	{
+		FWorld->Step( Delta );
+	}
+
+	void Box2DEventObserver::DrawBody( const Body& body )
 	{
 		const Mat22& R = body.rotation;
 		const Vec2& x = body.position;
@@ -108,7 +185,7 @@ namespace
 		for ( int i = 0 ; i < 4 ; i++ ) { DrawLine2( v[i], v[( i + 1 ) % 4] ); };
 	}
 
-	void DrawJoint( const Joint& joint )
+	void Box2DEventObserver::DrawJoint( const Joint& joint )
 	{
 		Body* b1 = joint.body1;
 		Body* b2 = joint.body2;
@@ -126,76 +203,6 @@ namespace
 		DrawLine2( p1, x2 );
 		DrawLine2( x2, p2 );
 		DrawLine2( p2, x1 );
-	}
-
-	struct Box2DEventObserver : public EventObserver
-	{
-		Box2DEventObserver()
-			: FLocalTime(0.f)
-			  , FRecipCyclesPerSecond(1.f)
-		{}
-
-		virtual ~Box2DEventObserver() {}
-
-		virtual void OnStart();
-		virtual void OnDrawFrame();
-		virtual void OnTimer( float Delta );
-
-	private:
-		void StartTiming();
-		double GetSeconds();
-		void GenerateTicks();
-
-		double FNewTime, FOldTime, FExecutionTime;
-		float FLocalTime;
-		float FRecipCyclesPerSecond;
-		std::auto_ptr<World> FWorld;
-	};
-
-	void Box2DEventObserver::OnStart()
-	{
-		XScale = YScale = 15.0;
-		XOfs = YOfs = 0;
-
-		const size_t FrameBufferSize = ImageWidth * ImageHeight * 4;
-		g_FrameBuffer = ( unsigned char* )malloc( FrameBufferSize );
-		memset( g_FrameBuffer, 0xFF, FrameBufferSize );
-
-		StartTiming();
-
-		FOldTime = GetSeconds();
-		FNewTime = FOldTime;
-
-		FExecutionTime = 0;
-
-		FWorld.reset( new World( Vec2( 0, 0 ), 10 ) );
-		setup3( FWorld.get() );
-	}
-
-	void Box2DEventObserver::OnDrawFrame()
-	{
-		// render physics world
-		Clear( 0xFFFFFF );
-
-		std::vector<Body*>::const_iterator BodyBegin = FWorld->bodies.begin(), BodyEnd = FWorld->bodies.end();
-		for ( ; BodyBegin != BodyEnd ; ++BodyBegin )
-		{
-			DrawBody( **BodyBegin );
-		}
-
-		std::vector<Joint*>::const_iterator JointsBegin = FWorld->joints.begin(), JointsEnd = FWorld->joints.end();
-		for ( ; JointsBegin != JointsEnd ; ++JointsBegin )
-		{
-			DrawJoint( **JointsBegin );
-		}
-
-		// update as fast as possible
-		GenerateTicks();
-	}
-
-	void Box2DEventObserver::OnTimer( float Delta )
-	{
-		FWorld->Step( Delta );
 	}
 
 	void Box2DEventObserver::GenerateTicks()
@@ -231,7 +238,7 @@ namespace
 		FRecipCyclesPerSecond = 1.0 / TIME_TO_DOUBLE(Freq);
 	}
 
-	double Box2DEventObserver::GetSeconds()
+	double Box2DEventObserver::GetSeconds() const
 	{
 		time_value_t Counter;
 

@@ -34,15 +34,17 @@
 #ifndef Wrapper_Callbacks_h
 #define Wrapper_Callbacks_h
 
-const int ImageWidth = 512;
-const int ImageHeight = 512;
-
-extern unsigned char* g_FrameBuffer;
+struct DrawFrameInfo
+{
+	const unsigned char* frame;
+	int frameWidth;
+	int frameHeight;
+};
 
 struct EventObserver
 {
 	virtual void OnStart() {}
-	virtual void OnDrawFrame() {}
+	virtual void OnDrawFrame( DrawFrameInfo* frameInfo ) {}
 	virtual void OnTimer( float Delta ) {}
 	virtual void OnKeyUp( int code ) {}
 	virtual void OnKeyDown( int code ) {}
@@ -61,7 +63,7 @@ struct PlatformLayer
 
 protected:
 	void FireOnStart() { if (FObserver) FObserver->OnStart(); }
-	void FireOnDrawFrame() { if (FObserver) FObserver->OnDrawFrame(); }
+	void FireOnDrawFrame( DrawFrameInfo* frameInfo ) { if (FObserver) FObserver->OnDrawFrame(frameInfo); }
 	void FireOnTimer( float Delta ) { if (FObserver) FObserver->OnTimer(Delta); }
 	void FireOnKeyUp( int code ) { if (FObserver) FObserver->OnKeyUp(code); }
 	void FireOnKeyDown( int code ) { if (FObserver) FObserver->OnKeyDown(code); }

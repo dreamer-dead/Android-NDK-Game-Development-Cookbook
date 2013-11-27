@@ -20,7 +20,7 @@ LRESULT CALLBACK WindowsPlatformLayer::WindowProcedureThunk( HWND h, UINT msg, W
 
 WindowsPlatformLayer::WindowsPlatformLayer()
 {
-	FObserver = CreateObserver(this);
+	FObserver = CreateObserver( this );
 }
 
 WindowsPlatformLayer::~WindowsPlatformLayer()
@@ -41,11 +41,14 @@ bool WindowsPlatformLayer::Init( const char* windowName )
 
 	if ( !RegisterClass( &wndClass ) ) { return false; }
 
+	DrawFrameInfo frameInfo;
+	FireOnDrawFrame( &frameInfo );
+
 	RECT Rect;
 	Rect.left = 0;
 	Rect.top = 0;
-	Rect.right  = ImageWidth;
-	Rect.bottom = ImageHeight;
+	Rect.right  = frameInfo.frameWidth;
+	Rect.bottom = frameInfo.frameHeight;
 
 	DWORD dwStyle = WS_OVERLAPPEDWINDOW;
 
@@ -64,16 +67,16 @@ bool WindowsPlatformLayer::Init( const char* windowName )
 
 	// Create the offscreen device context and buffer
 	FMemDC = CreateCompatibleDC( dc );
-	FBufferBitmap = CreateCompatibleBitmap( dc, ImageWidth, ImageHeight );
+	FBufferBitmap = CreateCompatibleBitmap( dc, frameInfo.frameWidth, frameInfo.frameHeight );
 
 	// filling the RGB555 bitmap header
 	memset( &FBitmapInfo.bmiHeader, 0, sizeof( BITMAPINFOHEADER ) );
 	FBitmapInfo.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
-	FBitmapInfo.bmiHeader.biWidth = ImageWidth;
-	FBitmapInfo.bmiHeader.biHeight = ImageHeight;
+	FBitmapInfo.bmiHeader.biWidth = frameInfo.frameWidth;
+	FBitmapInfo.bmiHeader.biHeight = frameInfo.frameHeight;
 	FBitmapInfo.bmiHeader.biPlanes = 1;
 	FBitmapInfo.bmiHeader.biBitCount = 32;
-	FBitmapInfo.bmiHeader.biSizeImage = ImageWidth * ImageHeight * 4;
+	FBitmapInfo.bmiHeader.biSizeImage = frameInfo.frameWidth * frameInfo.frameHeight * 4;
 
 	UpdateWindow( FWindowHandle );
 
@@ -84,6 +87,7 @@ LRESULT WindowsPlatformLayer::WindowProcedure( HWND h, UINT msg, WPARAM w, LPARA
 {
 	HDC dc;
 	PAINTSTRUCT ps;
+	DrawFrameInfo frameInfo;
 	int x = ( ( int )( short )LOWORD( p ) ), y = ( ( int )( short )HIWORD( p ) );
 
 	switch ( msg )
@@ -115,13 +119,13 @@ LRESULT WindowsPlatformLayer::WindowProcedure( HWND h, UINT msg, WPARAM w, LPARA
 			break;
 
 		case WM_PAINT:
-			FireOnDrawFrame();
+			FireOnDrawFrame( &frameInfo );
 			dc = BeginPaint( h, &ps );
 			// transfer the g_FrameBuffer to the FBufferBitmap
-			SetDIBits( FMemDC, FBufferBitmap, 0, ImageHeight, g_FrameBuffer, &FBitmapInfo, DIB_RGB_COLORS );
+			SetDIBits( FMemDC, FBufferBitmap, 0, frameInfo.frameHeight, frameInfo.frame, &FBitmapInfo, DIB_RGB_COLORS );
 			SelectObject( FMemDC, FBufferBitmap );
 			// Copying the offscreen buffer to the window surface
-			BitBlt( dc, 0, 0, ImageWidth, ImageHeight, FMemDC, 0, 0, SRCCOPY );
+			BitBlt( dc, 0, 0, frameInfo.frameWidth, frameInfo.frameHeight, FMemDC, 0, 0, SRCCOPY );
 			EndPaint( h, &ps );
 			break;
 
@@ -139,8 +143,7 @@ int main()
 	g_windowToClassMap.object = NULL;
 	WindowsPlatformLayer platform;
 
-	const char WinName[] = "MyWin";
-	if ( !platform.Init( WinName) ) { return 0; }
+	if ( !platform.Init( "MyWin") ) { return 0; }
 
 	MSG msg;
 	while ( GetMessage( &msg, NULL, 0, 0 ) )
@@ -148,8 +151,6 @@ int main()
 		TranslateMessage( &msg );
 		DispatchMessage( &msg );
 	}
-
-	free( g_FrameBuffer );
 
 	return msg.wParam;
 }

@@ -36,15 +36,7 @@
 #include <algorithm> // For std::swap
 #include <cstring> // For memcpy
 
-const int Width = ImageWidth;
-const int Height = ImageHeight;
-
-float XScale, YScale;
-float XOfs, YOfs;
-
-unsigned char* g_FrameBuffer;
-
-void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color )
+void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color )
 {
 	using std::swap;
 
@@ -68,7 +60,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 		while ( y <= p2y )
 		{
-			set_pixel( fb, w, h, x, y, color );
+			SetPixel( fb, w, h, x, y, color );
 			y++;
 		}
 
@@ -82,7 +74,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 		while ( x <= p2x )
 		{
-			set_pixel( fb, w, h, x, y, color );
+			SetPixel( fb, w, h, x, y, color );
 			x++;
 		}
 
@@ -108,7 +100,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 			while ( x <= p2x )
 			{
-				set_pixel( fb, w, h, x, y, color );
+				SetPixel( fb, w, h, x, y, color );
 
 				if ( F <= 0 )
 				{
@@ -134,7 +126,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 			while ( y <= p2y )
 			{
-				set_pixel( fb, w, h, x, y, color );
+				SetPixel( fb, w, h, x, y, color );
 
 				if ( F <= 0 )
 				{
@@ -162,7 +154,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 			while ( x <= p2x )
 			{
-				set_pixel( fb, w, h, x, y, color );
+				SetPixel( fb, w, h, x, y, color );
 
 				if ( F <= 0 )
 				{
@@ -188,7 +180,7 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 
 			while ( y >= p2y )
 			{
-				set_pixel( fb, w, h, x, y, color );
+				SetPixel( fb, w, h, x, y, color );
 
 				if ( F <= 0 )
 				{
@@ -206,24 +198,51 @@ void line_bresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x,
 	}
 }
 
-void Clear( int color )
+Renderer::~Renderer()
+{
+	if ( FFrameBuffer )
+		free( FFrameBuffer );
+	FFrameBufferSize = 0;
+}
+
+bool Renderer::Init()
+{
+	if (FFrameBuffer)
+		free( FFrameBuffer );
+
+	const size_t FrameBufferSize = FWidth * FHeight * 4;
+	FFrameBuffer = ( unsigned char* )malloc( FrameBufferSize );
+
+	if (!FFrameBuffer)
+	{
+		FFrameBufferSize = 0;
+		return false;
+	}
+
+	FFrameBufferSize = FrameBufferSize;
+	memset( FFrameBuffer, 0xFF, FFrameBufferSize );
+}
+
+void Renderer::Clear( int color )
 {
 	const unsigned char PATTERN[] = { color & 0xFF, ( color >> 8 ) & 0xFF, ( color >> 16 ) & 0xFF, 0x00 };
-	const size_t BufferLength = Width * Height * 4;
-	size_t BlockSize = sizeof(PATTERN); // Size of pattern
-	unsigned char* Ptr = g_FrameBuffer;
+	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
+	unsigned char* Ptr = FFrameBuffer;
 
-	memcpy(Ptr, PATTERN, BlockSize);
+	if ( FFrameBufferSize < BlockSize )
+		return;
+
+	memcpy( Ptr, PATTERN, BlockSize );
 	unsigned char * Start = Ptr;
 	unsigned char * Current = Ptr + BlockSize;
-	unsigned char * End = Start + BufferLength;
+	unsigned char * End = Start + FFrameBufferSize;
 
 	// Fill the buffer with pattern.
-	while(Current + BlockSize < End) {
-	    memcpy(Current, Start, BlockSize);
+	while( Current + BlockSize < End ) {
+	    memcpy( Current, Start, BlockSize );
 	    Current += BlockSize;
 	    BlockSize *= 2;
 	}
 	// Fill the rest.
-	memcpy(Current, Start, static_cast<size_t>( End - Current ));
+	memcpy( Current, Start, static_cast<size_t>( End - Current ) );
 }
