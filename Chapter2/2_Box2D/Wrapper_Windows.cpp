@@ -29,13 +29,13 @@ WindowsPlatformLayer::~WindowsPlatformLayer()
 	DeleteObject( FBufferBitmap );
 }
 
-bool WindowsPlatformLayer::Init( const char* windowName )
+bool WindowsPlatformLayer::Init( const char* className, const char* windowTitle )
 {
 	FireOnStart();
 
 	WNDCLASS wndClass;
 	memset( &wndClass, 0, sizeof( WNDCLASS ) );
-	wndClass.lpszClassName = windowName;
+	wndClass.lpszClassName = className;
 	wndClass.lpfnWndProc = &WindowsPlatformLayer::WindowProcedureThunk;
 	wndClass.hCursor = LoadCursor( NULL, IDC_ARROW );
 
@@ -57,7 +57,7 @@ bool WindowsPlatformLayer::Init( const char* windowName )
 	int WinWidth  = Rect.right  - Rect.left;
 	int WinHeight = Rect.bottom - Rect.top;
 
-	FWindowHandle = CreateWindowA( windowName, "App4", dwStyle, 100, 100, WinWidth, WinHeight, 0, NULL, NULL, NULL );
+	FWindowHandle = CreateWindowA( className, windowTitle, dwStyle, 100, 100, WinWidth, WinHeight, 0, NULL, NULL, NULL );
 	g_windowToClassMap.window = FWindowHandle;
 	g_windowToClassMap.object = this;
 
@@ -143,7 +143,7 @@ int main()
 	g_windowToClassMap.object = NULL;
 	WindowsPlatformLayer platform;
 
-	if ( !platform.Init( "MyWin") ) { return 0; }
+	if ( !platform.Init( "MyWinClass", "App4" ) ) { return 0; }
 
 	MSG msg;
 	while ( GetMessage( &msg, NULL, 0, 0 ) )

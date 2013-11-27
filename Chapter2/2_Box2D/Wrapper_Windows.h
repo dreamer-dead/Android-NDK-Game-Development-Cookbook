@@ -44,7 +44,7 @@ public:
 	WindowsPlatformLayer();
 	~WindowsPlatformLayer();
 
-	bool Init( const char* windowName );
+	bool Init( const char* className, const char* windowTitle );
 
 private:
 	static LRESULT CALLBACK WindowProcedureThunk( HWND h, UINT msg, WPARAM w, LPARAM p );
