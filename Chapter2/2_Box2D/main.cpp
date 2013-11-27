@@ -251,7 +251,5 @@ namespace
 // static
 EventObserver* PlatformLayer::CreateObserver(PlatformLayer* platform)
 {
-	static Box2DEventObserver observer;
-
-	return &observer;
+	return new Box2DEventObserver();
 }

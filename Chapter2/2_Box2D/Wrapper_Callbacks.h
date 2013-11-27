@@ -59,7 +59,7 @@ struct PlatformLayer
 {
 	static EventObserver* CreateObserver(PlatformLayer* platform);
 
-	virtual ~PlatformLayer() {}
+	virtual ~PlatformLayer() { delete FObserver; FObserver = NULL; }
 
 protected:
 	void FireOnStart() { if (FObserver) FObserver->OnStart(); }
