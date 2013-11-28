@@ -36,11 +36,66 @@
 #include <algorithm> // For std::swap
 #include <cstring> // For memcpy
 
+namespace
+{
+	struct LineRenderer;
+
+	template<const bool SWAP_XY>
+	void SetPixelImpl( const LineRenderer& renderer, int x, int y );
+
+	struct LineRenderer
+	{
+		LineRenderer( unsigned char* buffer, int width, int height, int color )
+			: FBuffer( buffer ), FWidth( width ), FHeight( height ), FColor( color )
+		{}
+
+		template <const int XDIRECTION, const int YDIRECTION, const bool COORD_COMPARE, const bool SWAP_XY>
+		inline void DrawLine( const int d, const int d2, const int delta, int linearCoord, int p1y, const int linearCoordLimit ) const
+		{
+			int F = d2 + d;    // initial F
+
+			while ( ( linearCoord < linearCoordLimit ) == COORD_COMPARE || linearCoord == linearCoordLimit )
+			{
+				SetPixelImpl<SWAP_XY>( *this, linearCoord, p1y );
+
+				if ( F <= 0 )
+				{
+					F += d2;
+				}
+				else
+				{
+					p1y += YDIRECTION;
+					F += delta;
+				}
+
+				linearCoord += XDIRECTION;
+			}
+		}
+
+		unsigned char* FBuffer;
+		const int FWidth;
+		const int FHeight;
+		const int FColor;
+	};
+
+	template<const bool SWAP_XY>
+	void SetPixelImpl( const LineRenderer& renderer, int x, int y )
+	{
+		::SetPixel( renderer.FBuffer, renderer.FWidth, renderer.FHeight, x, y, renderer.FColor );
+	}
+
+	template<>
+	void SetPixelImpl<true>( const LineRenderer& renderer, int x, int y )
+	{
+		::SetPixel( renderer.FBuffer, renderer.FWidth, renderer.FHeight, y, x, renderer.FColor );
+	}
+}
+
 void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, int p2y, int color )
 {
 	using std::swap;
 
-	int F, x, y;
+	int x, y;
 
 	if ( p1x > p2x ) // Swap points if p1 is on the right of p2
 	{
@@ -48,6 +103,7 @@ void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, 
 		swap( p1y, p2y );
 	}
 
+	LineRenderer lr(fb, w, h, color);
 	// Handle trivial cases separately for algorithm speed up.
 	// Trivial case 1: m = +/-INF (Vertical line)
 	if ( p1x == p2x )
@@ -60,7 +116,7 @@ void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, 
 
 		while ( y <= p2y )
 		{
-			SetPixel( fb, w, h, x, y, color );
+			SetPixelImpl< false >( lr, x, y );
 			y++;
 		}
 
@@ -74,72 +130,32 @@ void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, 
 
 		while ( x <= p2x )
 		{
-			SetPixel( fb, w, h, x, y, color );
+			SetPixelImpl< false >( lr, x, y );
 			x++;
 		}
 
 		return;
 	}
 
-	int dy            = p2y - p1y;  // y-increment from p1 to p2
-	int dx            = p2x - p1x;  // x-increment from p1 to p2
-	int dy2           = ( dy << 1 ); // dy << 1 == 2*dy
-	int dx2           = ( dx << 1 );
-	int dy2_minus_dx2 = dy2 - dx2;  // precompute constant for speed up
-	int dy2_plus_dx2  = dy2 + dx2;
+	const int dy            = p2y - p1y;  // y-increment from p1 to p2
+	const int dx            = p2x - p1x;  // x-increment from p1 to p2
+	const int dy2           = ( dy << 1 ); // dy << 1 == 2*dy
+	const int dx2           = ( dx << 1 );
+	const int dy2_minus_dx2 = dy2 - dx2;  // precompute constant for speed up
+	const int dy2_plus_dx2  = dy2 + dx2;
 
 	if ( dy >= 0 )  // m >= 0
 	{
 		// Case 1: 0 <= m <= 1 (Original case)
 		if ( dy <= dx )
 		{
-			F = dy2 - dx;    // initial F
-
-			x = p1x;
-			y = p1y;
-
-			while ( x <= p2x )
-			{
-				SetPixel( fb, w, h, x, y, color );
-
-				if ( F <= 0 )
-				{
-					F += dy2;
-				}
-				else
-				{
-					y++;
-					F += dy2_minus_dx2;
-				}
-
-				x++;
-			}
+			lr.DrawLine<1, 1, true, false>( -dx, dy2, dy2_minus_dx2, p1x, p1y, p2x );
 		}
 		// Case 2: 1 < m < INF (Mirror about y=x line
 		// replace all dy by dx and dx by dy)
 		else
 		{
-			F = dx2 - dy;    // initial F
-
-			y = p1y;
-			x = p1x;
-
-			while ( y <= p2y )
-			{
-				SetPixel( fb, w, h, x, y, color );
-
-				if ( F <= 0 )
-				{
-					F += dx2;
-				}
-				else
-				{
-					x++;
-					F -= dy2_minus_dx2;
-				}
-
-				y++;
-			}
+			lr.DrawLine<1, 1, true, true>( -dy, dx2, -dy2_minus_dx2, p1y, p1x, p2y );
 		}
 	}
 	else    // m < 0
@@ -147,53 +163,13 @@ void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, 
 		// Case 3: -1 <= m < 0 (Mirror about x-axis, replace all dy by -dy)
 		if ( dx >= -dy )
 		{
-			F = -dy2 - dx;    // initial F
-
-			x = p1x;
-			y = p1y;
-
-			while ( x <= p2x )
-			{
-				SetPixel( fb, w, h, x, y, color );
-
-				if ( F <= 0 )
-				{
-					F -= dy2;
-				}
-				else
-				{
-					y--;
-					F -= dy2_plus_dx2;
-				}
-
-				x++;
-			}
+			lr.DrawLine<1, -1, true, false>( -dx, -dy2, -dy2_plus_dx2, p1x, p1y, p2x );
 		}
 		// Case 4: -INF < m < -1 (Mirror about x-axis and mirror
 		// about y=x line, replace all dx by -dy and dy by dx)
 		else
 		{
-			F = dx2 + dy;    // initial F
-
-			y = p1y;
-			x = p1x;
-
-			while ( y >= p2y )
-			{
-				SetPixel( fb, w, h, x, y, color );
-
-				if ( F <= 0 )
-				{
-					F += dx2;
-				}
-				else
-				{
-					x++;
-					F += dy2_plus_dx2;
-				}
-
-				y--;
-			}
+			lr.DrawLine<-1, 1, false, true>( dy, dx2, dy2_plus_dx2, p1y, p1x, p2y );
 		}
 	}
 }
@@ -209,14 +185,14 @@ bool Renderer::Init()
 void Renderer::Clear( int color ) const
 {
 	const unsigned char PATTERN[] = { color & 0xFF, ( color >> 8 ) & 0xFF, ( color >> 16 ) & 0xFF, 0x00 };
+	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
 
 	if ( FFrameBuffer.size() < BlockSize )
 		return;
 
-	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
 	unsigned char* Ptr = &FFrameBuffer[0];
 	memcpy( Ptr, PATTERN, BlockSize );
-	
+
 	unsigned char * Start = Ptr;
 	unsigned char * Current = Ptr + BlockSize;
 	unsigned char * End = Start + FFrameBuffer.size();
