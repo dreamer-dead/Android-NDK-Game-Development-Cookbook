@@ -33,6 +33,7 @@
 
 #include <stdlib.h>
 #include <memory>
+#include <algorithm>
 
 #include "Wrapper_Callbacks.h"
 #include "Rendering.h"
@@ -78,6 +79,7 @@ typedef int64_t time_value_t;
 
 #else
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 typedef LARGE_INTEGER time_value_t;
@@ -94,10 +96,41 @@ namespace
 
 	using namespace Box2D;
 
+	// TODO: Move Timer class to it's own header + impl
+	struct Timer
+	{
+		Timer() : FRecipCyclesPerSecond( 1.f ) {}
+
+		void StartTiming();
+		double GetSeconds() const;
+
+	private:
+		double FRecipCyclesPerSecond;
+	};
+
+	void Timer::StartTiming()
+	{
+		/// Initialize timing
+		time_value_t Freq;
+
+		QueryPerformanceFrequency( &Freq );
+
+		FRecipCyclesPerSecond = 1.0 / TIME_TO_DOUBLE(Freq);
+	}
+
+	double Timer::GetSeconds() const
+	{
+		time_value_t Counter;
+
+		QueryPerformanceCounter( &Counter );
+
+		return FRecipCyclesPerSecond * TIME_TO_DOUBLE(Counter);
+	}
+
 	struct Box2DEventObserver: public EventObserver
 	{
 		Box2DEventObserver()
-			: FLocalTime(0.f), FRecipCyclesPerSecond(1.f),
+			: FLocalTime(0.f),
 				FRenderer(ImageWidth, ImageHeight)
 		{}
 
@@ -108,73 +141,77 @@ namespace
 		virtual void OnTimer( float Delta );
 
 	private:
-		void DrawLine2( const Vec2& v1, const Vec2& v2 )
+		struct BoxObjectsRenderer
 		{
-			FRenderer.LineW( v1.x, v1.y, v2.x, v2.y, 0 ); // 0xFFFFFF);
-		}
+			BoxObjectsRenderer( int w, int h )
+				: FRenderer( w, h ),
+					FCurrentColor( 0 ),
+					FFillColor( 0xFFFFFF )
+			{}
 
-		void DrawBody( const Body& body );
-		void DrawJoint( const Joint& joint );
+			bool Init(const Vec2& scale, const Vec2& offset)
+			{
+				FRenderer.SetScale( scale.x, scale.y );
+				FRenderer.SetOffsets( offset.x, offset.y );
+				return FRenderer.Init();
+			}
 
-		void StartTiming();
-		double GetSeconds() const;
+			void SetCurrentColor( int color )
+			{
+				FCurrentColor = color;
+			}
+
+			void DrawLine( const Vec2& v1, const Vec2& v2 ) const
+			{
+				FRenderer.LineW( v1.x, v1.y, v2.x, v2.y, FCurrentColor );
+			}
+
+			void Draw( const Body& body ) const;
+			void Draw( const Joint& joint ) const;
+
+			void Clear() const
+			{
+				FRenderer.Clear( FFillColor );
+			}
+
+			void FillDrawFrameInfo( DrawFrameInfo* frameInfo ) const
+			{
+				frameInfo->frame = FRenderer.GetFrameBuffer();
+				frameInfo->frameWidth = FRenderer.GetWidth();
+				frameInfo->frameHeight = FRenderer.GetHeight();
+			}
+
+			Renderer FRenderer;
+			int FCurrentColor;
+			int FFillColor;
+		};
+
+		struct RenderBoxObjectFunc
+		{
+			RenderBoxObject( BoxObjectsRenderer& renderer )
+				: FRenderer( renderer )
+			{}
+
+			template<typename BoxObjectType>
+			void operator ()( const BoxObjectType* object ) const
+			{
+				FRenderer.Draw( *object );
+			}
+
+			BoxObjectsRenderer& FRenderer;
+		};
+
 		void GenerateTicks();
 
 		double FNewTime, FOldTime, FExecutionTime;
 		float FLocalTime;
 		float FRecipCyclesPerSecond;
 		std::auto_ptr<World> FWorld;
-		Renderer FRenderer;
+		BoxObjectsRenderer FRenderer;
+		Timer FTimer;
 	};
 
-	void Box2DEventObserver::OnStart()
-	{
-		FRenderer.SetScale( 15.f, 15.f );
-		FRenderer.SetOffsets( 0.f, 0.f );
-		FRenderer.Init();
-
-		StartTiming();
-
-		FOldTime = GetSeconds();
-		FNewTime = FOldTime;
-
-		FExecutionTime = 0;
-
-		FWorld.reset( new World( Vec2( 0, 0 ), 10 ) );
-		setup3( FWorld.get() );
-	}
-
-	void Box2DEventObserver::OnDrawFrame( DrawFrameInfo* frameInfo )
-	{
-		// render physics world
-		FRenderer.Clear( 0xFFFFFF );
-
-		std::vector<Body*>::const_iterator BodyBegin = FWorld->bodies.begin(), BodyEnd = FWorld->bodies.end();
-		for ( ; BodyBegin != BodyEnd ; ++BodyBegin )
-		{
-			DrawBody( **BodyBegin );
-		}
-
-		std::vector<Joint*>::const_iterator JointsBegin = FWorld->joints.begin(), JointsEnd = FWorld->joints.end();
-		for ( ; JointsBegin != JointsEnd ; ++JointsBegin )
-		{
-			DrawJoint( **JointsBegin );
-		}
-
-		// update as fast as possible
-		GenerateTicks();
-
-		frameInfo->frame = FRenderer.GetFrameBuffer();
-		frameInfo->frameWidth = FRenderer.GetWidth();
-		frameInfo->frameHeight = FRenderer.GetHeight();
-	}
-
-	void Box2DEventObserver::OnTimer( float Delta )
-	{
-		FWorld->Step( Delta );
-	}
-
-	void Box2DEventObserver::DrawBody( const Body& body )
+	void Box2DEventObserver::BoxObjectsRenderer::Draw( const Body& body ) const
 	{
 		const Mat22& R = body.rotation;
 		const Vec2& x = body.position;
@@ -182,10 +219,10 @@ namespace
 
 		Vec2 v[] = { ( x + R * Vec2( -h.x, -h.y ) ), ( x + R * Vec2( h.x, -h.y ) ), ( x + R * Vec2( h.x,  h.y ) ), ( x + R * Vec2( -h.x,  h.y ) ) };
 
-		for ( int i = 0 ; i < 4 ; i++ ) { DrawLine2( v[i], v[( i + 1 ) % 4] ); };
+		for ( int i = 0 ; i < 4 ; i++ ) { DrawLine( v[i], v[( i + 1 ) % 4] ); };
 	}
 
-	void Box2DEventObserver::DrawJoint( const Joint& joint )
+	void Box2DEventObserver::BoxObjectsRenderer::Draw( const Joint& joint ) const
 	{
 		Body* b1 = joint.body1;
 		Body* b2 = joint.body2;
@@ -199,10 +236,46 @@ namespace
 		const Vec2& x2 = b2->position;
 		const Vec2& p2 = x2 + R2 * joint.localAnchor2;
 
-		DrawLine2( x1, p1 );
-		DrawLine2( p1, x2 );
-		DrawLine2( x2, p2 );
-		DrawLine2( p2, x1 );
+		DrawLine( x1, p1 );
+		DrawLine( p1, x2 );
+		DrawLine( x2, p2 );
+		DrawLine( p2, x1 );
+	}
+
+	void Box2DEventObserver::OnStart()
+	{
+		// TODO: Handling result from Init call.
+		FRenderer.Init( Vec2( 15.f, 15.f ), Vec2( 0.f, 0.f ));
+
+		FTimer.StartTiming();
+
+		FOldTime = FTimer.GetSeconds();
+		FNewTime = FOldTime;
+
+		FExecutionTime = 0;
+
+		FWorld.reset( new World( Vec2( 0, 0 ), 10 ) );
+		setup3( FWorld.get() );
+	}
+
+	void Box2DEventObserver::OnDrawFrame( DrawFrameInfo* frameInfo )
+	{
+		// render physics world
+		FRenderer.Clear();
+
+		const RenderBoxObjectFunc RenderFunc(FRenderer);
+		std::for_each( FWorld->bodies.begin(), FWorld->bodies.end(), RenderFunc );
+		std::for_each( FWorld->joints.begin(), FWorld->joints.end(), RenderFunc );
+
+		// update as fast as possible
+		GenerateTicks();
+
+		FRenderer.FillDrawFrameInfo( frameInfo );
+	}
+
+	void Box2DEventObserver::OnTimer( float Delta )
+	{
+		FWorld->Step( Delta );
 	}
 
 	void Box2DEventObserver::GenerateTicks()
@@ -211,7 +284,7 @@ namespace
 		static const float MAX_EXECUTION_TIME = 10.0f * TIME_QUANTUM;
 
 		// update time
-		FNewTime = GetSeconds();
+		FNewTime = FTimer.GetSeconds();
 		float DeltaSeconds = static_cast<float>( FNewTime - FOldTime );
 		FOldTime = FNewTime;
 
@@ -226,25 +299,6 @@ namespace
 			FExecutionTime -= TIME_QUANTUM;
 			OnTimer( TIME_QUANTUM );
 		}
-	}
-
-	void Box2DEventObserver::StartTiming()
-	{
-		/// Initialize timing
-		time_value_t Freq;
-
-		QueryPerformanceFrequency( &Freq );
-
-		FRecipCyclesPerSecond = 1.0 / TIME_TO_DOUBLE(Freq);
-	}
-
-	double Box2DEventObserver::GetSeconds() const
-	{
-		time_value_t Counter;
-
-		QueryPerformanceCounter( &Counter );
-
-		return FRecipCyclesPerSecond * TIME_TO_DOUBLE(Counter);
 	}
 } // namespace
 

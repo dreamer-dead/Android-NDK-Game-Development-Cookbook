@@ -65,22 +65,22 @@ public:
   void SetScale( float x, float y ) { FXScale = x; FYScale = y; }
   void SetOffsets( float x, float y ) { FYOfs = x; FYOfs = y; }
 
-  int XToScreen( float x ) { return FWidth / 2 + x * FXScale + FXOfs; }
-  int YToScreen( float y ) { return FHeight / 2 - y * FYScale + FYOfs; }
+  int XToScreen( float x ) const { return FWidth / 2 + x * FXScale + FXOfs; }
+  int YToScreen( float y ) const { return FHeight / 2 - y * FYScale + FYOfs; }
 
-  float ScreenToX( int x ) { return ( ( float )( x - FWidth / 2 )  - FXOfs ) / FXScale; }
-  float ScreenToY( int y ) { return -( ( float )( y - FHeight / 2 ) - FYOfs ) / FYScale; }
+  float ScreenToX( int x ) const { return ( ( float )( x - FWidth / 2 )  - FXOfs ) / FXScale; }
+  float ScreenToY( int y ) const { return -( ( float )( y - FHeight / 2 ) - FYOfs ) / FYScale; }
 
   bool Init();
   
-  void Clear( int color );
+  void Clear( int color ) const;
 
-  inline void Line( int x1, int y1, int x2, int y2, int color )
+  inline void Line( int x1, int y1, int x2, int y2, int color ) const
   {
     LineBresenham( FFrameBuffer, FWidth, FHeight, x1, y1, x2, y2, color );
   }
 
-  inline void LineW( float x1, float y1, float x2, float y2, int color )
+  inline void LineW( float x1, float y1, float x2, float y2, int color ) const
   {
     Line( XToScreen( x1 ), YToScreen( y1 ), XToScreen( x2 ), YToScreen( y2 ), color );
   }

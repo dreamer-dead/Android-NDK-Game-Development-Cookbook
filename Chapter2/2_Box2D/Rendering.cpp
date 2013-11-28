@@ -223,7 +223,7 @@ bool Renderer::Init()
 	memset( FFrameBuffer, 0xFF, FFrameBufferSize );
 }
 
-void Renderer::Clear( int color )
+void Renderer::Clear( int color ) const
 {
 	const unsigned char PATTERN[] = { color & 0xFF, ( color >> 8 ) & 0xFF, ( color >> 16 ) & 0xFF, 0x00 };
 	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
