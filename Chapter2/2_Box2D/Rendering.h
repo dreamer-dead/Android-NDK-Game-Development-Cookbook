@@ -35,6 +35,8 @@
 #define Rendering_h
 
 #include <cstddef>
+#include <vector>
+
 #include "Wrapper_Callbacks.h"
 
 inline void SetPixel( unsigned char* fb, int w, int h, int x, int y, int color )
@@ -56,11 +58,10 @@ public:
   Renderer( int w, int h )
     : FWidth( w ), FHeight( h ),
       FXScale(1.f), FYScale(1.f),
-      FXOfs(0.f), FYOfs(0.f),
-      FFrameBuffer(NULL), FFrameBufferSize(0)
+      FXOfs(0.f), FYOfs(0.f)
   {}
 
-  ~Renderer();
+  ~Renderer() {}
 
   void SetScale( float x, float y ) { FXScale = x; FYScale = y; }
   void SetOffsets( float x, float y ) { FYOfs = x; FYOfs = y; }
@@ -77,7 +78,7 @@ public:
 
   inline void Line( int x1, int y1, int x2, int y2, int color ) const
   {
-    LineBresenham( FFrameBuffer, FWidth, FHeight, x1, y1, x2, y2, color );
+    LineBresenham( &FFrameBuffer[0], FWidth, FHeight, x1, y1, x2, y2, color );
   }
 
   inline void LineW( float x1, float y1, float x2, float y2, int color ) const
@@ -85,14 +86,13 @@ public:
     Line( XToScreen( x1 ), YToScreen( y1 ), XToScreen( x2 ), YToScreen( y2 ), color );
   }
 
-  const unsigned char* GetFrameBuffer() const { return FFrameBuffer; }
+  const unsigned char* GetFrameBuffer() const { return &FFrameBuffer[0]; }
 
   size_t GetWidth() const { return FWidth; }
   size_t GetHeight() const { return FHeight; }
 
 private:
-  unsigned char* FFrameBuffer;
-  size_t FFrameBufferSize;
+  mutable std::vector<unsigned char> FFrameBuffer;
   float FXScale, FYScale;
   float FXOfs, FYOfs;
 

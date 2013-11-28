@@ -198,44 +198,28 @@ void LineBresenham( unsigned char* fb, int w, int h, int p1x, int p1y, int p2x, 
 	}
 }
 
-Renderer::~Renderer()
-{
-	if ( FFrameBuffer )
-		free( FFrameBuffer );
-	FFrameBufferSize = 0;
-}
-
 bool Renderer::Init()
 {
-	if (FFrameBuffer)
-		free( FFrameBuffer );
+	FFrameBuffer.resize( FWidth * FHeight * 4 );
 
-	const size_t FrameBufferSize = FWidth * FHeight * 4;
-	FFrameBuffer = ( unsigned char* )malloc( FrameBufferSize );
-
-	if (!FFrameBuffer)
-	{
-		FFrameBufferSize = 0;
-		return false;
-	}
-
-	FFrameBufferSize = FrameBufferSize;
-	memset( FFrameBuffer, 0xFF, FFrameBufferSize );
+	// TODO: Use std::fill() instead memset.
+	memset( &FFrameBuffer[0], 0xFF, FFrameBuffer.size() );
 }
 
 void Renderer::Clear( int color ) const
 {
 	const unsigned char PATTERN[] = { color & 0xFF, ( color >> 8 ) & 0xFF, ( color >> 16 ) & 0xFF, 0x00 };
-	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
-	unsigned char* Ptr = FFrameBuffer;
 
-	if ( FFrameBufferSize < BlockSize )
+	if ( FFrameBuffer.size() < BlockSize )
 		return;
 
+	size_t BlockSize = sizeof( PATTERN ); // Size of pattern
+	unsigned char* Ptr = &FFrameBuffer[0];
 	memcpy( Ptr, PATTERN, BlockSize );
+	
 	unsigned char * Start = Ptr;
 	unsigned char * Current = Ptr + BlockSize;
-	unsigned char * End = Start + FFrameBufferSize;
+	unsigned char * End = Start + FFrameBuffer.size();
 
 	// Fill the buffer with pattern.
 	while( Current + BlockSize < End ) {

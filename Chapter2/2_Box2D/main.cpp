@@ -188,7 +188,7 @@ namespace
 
 		struct RenderBoxObjectFunc
 		{
-			RenderBoxObject( BoxObjectsRenderer& renderer )
+			RenderBoxObjectFunc( BoxObjectsRenderer& renderer )
 				: FRenderer( renderer )
 			{}
 
